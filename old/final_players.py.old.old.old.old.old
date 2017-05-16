@@ -1,0 +1,540 @@
+# Name: Michael Rupprecht
+# CMS cluster login name: mrupprec
+
+'''
+final_players.py
+
+This module contains code for various bots that play Connect4 at varying 
+degrees of sophistication.
+'''
+
+import random
+from Connect4Simulator import *
+# Any other imports go here...
+
+
+class RandomPlayer:
+    '''
+    This player makes one of the possible moves on the game board,
+    chosen at random.
+    '''
+
+    def chooseMove(self, board, player):
+        '''
+        Given the current board and player number, choose and return a move.
+
+        Arguments:
+          board  -- a Connect4Board instance
+          player -- either 1 or 2
+
+        Precondition: There must be at least one legal move.
+        Invariant: The board state does not change.
+        '''
+
+        assert player in [1, 2]
+        possibles = board.possibleMoves()
+        assert possibles != []
+        return random.choice(possibles)
+
+
+class SimplePlayer:
+    '''
+    This player will always play a move that gives it a win if there is one.
+    Otherwise, it picks a random legal move.
+    '''
+
+    def chooseMove(self, board, player):
+        '''
+        Given the current board and player number, choose and return a move.
+
+        Arguments:
+          board  -- a Connect4Board instance
+          player -- either 1 or 2
+
+        Precondition: There must be at least one legal move.
+        Invariant: The board state does not change.
+        '''
+        
+        moves = board.possibleMoves()
+
+        # returns the first winning move it finds
+        for move in moves:
+            if board.isWinningMove(move, player):
+                return move
+
+        # if none exists, this line executes, returning a random move
+        return random.choice(moves)
+
+
+class BetterPlayer:
+    '''
+    This player will always play a move that gives it a win if there is one.
+    Otherwise, it tries all moves, collects all the moves which don't allow
+    the other player to win immediately, and picks one of those at random.
+    If there is no such move, it picks a random move.
+    '''
+
+    def chooseMove(self, board, player):
+        '''
+        Given the current board and player number, choose and return a move.
+
+        Arguments:
+          board  -- a Connect4Board instance
+          player -- either 1 or 2
+
+        Precondition: There must be at least one legal move.
+        Invariant: The board state does not change.
+        '''
+
+        # makes 2 1 and 1 2
+        player2 = player % 2 + 1
+        moves = board.possibleMoves()
+
+        # returns winning move, as before
+        for move in moves:
+            if board.isWinningMove(move, player):
+                return move
+
+        # winning move for the other player is the one to be blocked, and so
+        # this returns that
+        for move in moves:
+            if board.isWinningMove(move, player2):
+                return move
+
+        # otherwise, random
+        return random.choice(moves)
+
+class Monty:
+    '''
+    This player will randomly simulate games for each possible move,
+    picking the one that has the highest probability of success.
+    '''
+
+    def __init__(self, n, player):
+        '''
+        Initialize the player using a simpler computer player.
+
+        Arguments: 
+          n      -- number of games to simulate.
+          player -- the computer player
+        '''
+
+        assert n > 0
+        self.player = player
+        self.n = n
+
+    # not done because I *probably* have a good enough score and I *definitely*
+    # have more pressing matters to focus on
+    def chooseMove(self, board, player):
+        '''
+        Given the current board and player number, choose and return a move.
+
+        Arguments:
+          board  -- a Connect4Board instance
+          player -- either 1 or 2
+
+        Precondition: There must be at least one legal move.
+        Invariant: The board state does not change.
+        '''
+
+        pass
+
+class BMinimax:
+
+    class Tree:
+
+        class Node:
+
+            def __init__(self):
+
+                self.subs = []
+                self.value = 0
+
+                # temporary garbage values
+                self.up = -1
+                self.move = -1
+
+            def getSuper(self):
+
+                return self.up
+
+            def getSubs(self):
+
+                return self.subs
+
+            def getValue(self):
+
+                return self.value
+
+            def getMove(self):
+
+                return self.move
+
+            def setSuper(self, up):
+
+                self.up = up
+
+            def addSub(self, sub):
+
+                self.subs.append(sub)
+
+            def setValue(self, value):
+
+                self.value = value
+
+            def setMove(self, move):
+
+                self.move = move
+
+        def __init__(self, board, player, depth):
+
+            self.board = board
+            self.player = player
+            self.depth = depth
+            player2 = self.player % 2 + 1
+
+            self.top = self.Node()
+            self.top.setSuper(self.top)
+            self.top.setMove(-1)
+
+            self.subtree_maker(self.board, self.top, self.player, self.depth)
+
+        def getTop(self):
+
+            return self.top
+
+        def getDepth(self):
+
+            return self.depth
+
+        def subtree_maker(self, board, top, player, depth):
+
+            moves = board.possibleMoves()
+
+            if moves != [] and depth > 0:
+                for move in moves:
+                    node = self.Node()
+                    node.setSuper(top)
+                    node.setMove(move)
+                    board2 = board.clone()
+
+                    player2 = player % 2 + 1
+                    win = False
+                    if board2.isWinningMove(node.getMove(), player):
+                        node.setValue(1)
+                        win = True
+
+                    if not win:
+                        board2.makeMove(node.getMove(), player)
+                        # print board2.board
+                        self.subtree_maker(board2, node, player2, depth - 1)
+
+                    top.addSub(node)
+
+                max_value = -board.getCols() - 1
+                for node in top.getSubs():
+                    if node.getValue() > max_value:
+                        max_value = node.getValue()
+
+                top.setValue(-max_value)
+
+        def pprint_helper(self, top, tabs):
+
+            init_string = ""
+            for i in range(tabs):
+                init_string += "\t"
+            print init_string + str(top.getValue())
+            
+            for node in top.getSubs():
+
+                try:
+                    node.getSubs()[0]
+                    self.pprint_helper(node, tabs + 1)
+
+                except IndexError:
+                    pass
+
+        def pprint(self):
+
+            self.pprint_helper(self.top, 0)
+
+        def print_move_table(self):
+
+            result = {}
+            for node in self.top.getSubs():
+                result[node.getMove()] = node.getValue()
+            print result
+
+    def __init__(self, player, depth):
+
+        assert player in [1, 2]
+        self.player = player
+        self.depth = depth
+
+    def chooseMove(self, board, player):
+
+        moves = board.possibleMoves()
+        assert moves != []
+
+        #######
+
+        # does the same thing as BetterPlayer so as to make or block a winning
+        # move
+
+        # makes 2 1 and 1 2
+        player2 = player % 2 + 1
+
+        # returns winning move, as before
+        for move in moves:
+            if board.isWinningMove(move, player):
+                return move
+
+        # winning move for the other player is the one to be blocked, and so
+        # this returns that
+        for move in moves:
+            if board.isWinningMove(move, player2):
+                return move
+
+        #######
+
+        # otherwise, makes a tree and selects the best move
+
+        tree = self.Tree(board, player, self.depth)
+
+        # tree.pprint()
+        tree.print_move_table()
+
+        max_value = -(board.getCols() ** tree.getDepth()) - 1
+        move = -1
+        for node in tree.getTop().getSubs():
+            if node.getValue() > max_value:
+                max_value = node.getValue()
+                move = node.getMove()
+        return move
+
+class Minimax:
+
+    class Tree:
+
+        class Node:
+
+            def __init__(self):
+
+                self.subs = []
+                self.value = 0
+
+                # temporary garbage values
+                self.up = -1
+                self.move = -1
+
+            def getSuper(self):
+
+                return self.up
+
+            def getSubs(self):
+
+                return self.subs
+
+            def getValue(self):
+
+                return self.value
+
+            def getMove(self):
+
+                return self.move
+
+            def setSuper(self, up):
+
+                self.up = up
+
+            def addSub(self, sub):
+
+                self.subs.append(sub)
+
+            def setValue(self, value):
+
+                self.value = value
+
+            def setMove(self, move):
+
+                self.move = move
+
+        def __init__(self, board, player, depth):
+
+            self.board = board
+            self.player = player
+            self.depth = depth
+            player2 = self.player % 2 + 1
+
+            self.top = self.Node()
+            self.top.setSuper(self.top)
+            self.top.setMove(-1)
+
+            self.subtree_maker(self.board, self.top, self.player, self.depth)
+            
+            # for node in self.top.getSubs():
+            #     board2 = self.board.clone()
+            #     if board2.isWinningMove(node.getMove(), player):
+            #         # node.setValue(node.getValue() + 1)
+            #         print "A"
+            #         node.setValue(1)
+            #         continue
+            #     elif board2.isWinningMove(node.getMove(), player2):
+            #         # node.setValue(node.getValue() - 1)
+            #         node.setValue(-1)
+            #         continue
+
+                # board2.makeMove(node.getMove(), player)
+                # self.subtree_maker(board, node, player, self.depth)
+
+        def getTop(self):
+
+            return self.top
+
+        def getDepth(self):
+
+            return self.depth
+
+        def subtree_maker(self, board, top, player, depth):
+
+            moves = board.possibleMoves()
+
+            if moves != [] and depth > 0:
+                for move in moves:
+                    node = self.Node()
+                    node.setSuper(top)
+                    node.setMove(move)
+                    top.addSub(node)
+
+                    board2 = board.clone()
+                    player2 = player % 2 + 1
+                    win = False
+                    if board2.isWinningMove(node.getMove(), player):
+                        # node.setValue(node.getValue() + 1)
+                        node.setValue(1)
+                        top.setValue(-1)
+                        win = True
+                        break
+                        # node.setValue((player - 1) * 2 - 1)
+                    # if board2.isWinningMove(node.getMove(), player2):
+                    #     node.setValue(-1)
+
+                    board2.makeMove(node.getMove(), player)
+                    # print board2.board
+                    self.subtree_maker(board2, node, player2, depth - 1)
+                    if node.getValue() == 1:
+                        top.setValue(-1)
+                        win = True
+                        break
+
+                # total = 0
+                # for node in top.getSubs():
+                #     total += node.getValue()
+
+                if not win:
+                    max_value = -board.getCols() - 1
+                    # move = -1
+                    for node in top.getSubs():
+                        if node.getValue() > max_value:
+                            max_value = node.getValue()
+                            # move = node.getMove()
+
+                    # if max_value == 0:
+                    #     max_value = board.getCols() + 1
+                    #     move = -1
+                    #     for node in top.getSubs():
+                    #         if node.getValue() < max_value:
+                    #             max_value = node.getValue()
+                    #             move = node.getMove()
+
+                    top.setValue(-max_value)
+
+                # n1 = True
+                # p1 = True
+
+                # for node in top.getSubs():
+                #     if node.getValue() == 1:
+                #         n1 = False
+                #     elif node.getValue() == -1:
+                #         p1 = False
+
+                # if p1:
+                #     top.setValue(-1)
+                # elif n1:
+                #     top.setValue(1)
+
+        def pprint_helper(self, top, tabs):
+
+            init_string = ""
+            for i in range(tabs):
+                init_string += "\t"
+            print init_string + str(top.getValue())
+            
+            for node in top.getSubs():
+
+                try:
+                    node.getSubs()[0]
+                    self.pprint_helper(node, tabs + 1)
+
+                except IndexError:
+                    pass
+
+        def pprint(self):
+
+            self.pprint_helper(self.top, 0)
+
+        def print_move_table(self):
+
+            result = {}
+            for node in self.top.getSubs():
+                result[node.getMove()] = node.getValue()
+            print result
+
+    def __init__(self, player, depth):
+
+        assert player in [1, 2]
+        self.player = player
+        self.depth = depth
+
+    def chooseMove(self, board, player):
+
+        moves = board.possibleMoves()
+        assert moves != []
+
+        #######
+
+        # does the same thing as BetterPlayer so as to make or block a winning
+        # move
+
+        # makes 2 1 and 1 2
+        player2 = player % 2 + 1
+
+        # returns winning move, as before
+        for move in moves:
+            if board.isWinningMove(move, player):
+                return move
+
+        # winning move for the other player is the one to be blocked, and so
+        # this returns that
+        for move in moves:
+            if board.isWinningMove(move, player2):
+                return move
+
+        #######
+
+        # otherwise, makes a tree and selects the best move
+
+        tree = self.Tree(board, player, self.depth)
+
+        # tree.pprint()
+        tree.print_move_table()
+
+        max_value = -(board.getCols() ** tree.getDepth()) - 1
+        move = -1
+        for node in tree.getTop().getSubs():
+            if node.getValue() > max_value:
+                max_value = node.getValue()
+                move = node.getMove()
+        c4s = Connect4Simulator(tree.board, SimplePlayer, Minimax, self.player)
+        c4s.simulate()
+        return move
